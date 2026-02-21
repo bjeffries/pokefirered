@@ -11,6 +11,7 @@
 #include "save.h"
 #include "new_game.h"
 #include "title_screen.h"
+#include "main_menu.h"
 #include "decompress.h"
 #include "util.h"
 #include "trig.h"
@@ -982,7 +983,13 @@ static bool8 SetUpCopyrightScreen(void)
         break;
     case 142:
         ResetSerial();
+#if defined(SKIP_TITLE_SCREEN)
+        SetMainCallback2(CB2_InitMainMenu);
+#elif defined(SKIP_GF_INTRO)
+        SetMainCallback2(CB2_InitTitleScreen);
+#else
         SetMainCallback2(CB2_WaitFadeBeforeSetUpIntro);
+#endif
         break;
     }
     return TRUE;
