@@ -683,12 +683,41 @@ static void CB2_NewGameScene(void)
     UpdatePaletteFade();
 }
 
+#if defined(PRESET_PLAYER_GENDER) && defined(PRESET_PLAYER_NAME) && defined(PRESET_RIVAL_NAME)
+// Converts a plain ASCII string (A-Z, a-z) to the game's internal text
+// encoding and writes it to dst. Stops at the end of src or PLAYER_NAME_LENGTH,
+// whichever comes first, and appends the EOS byte (0xFF).
+static void CopyAsciiToGameName(u8 *dst, const char *src)
+{
+    u8 i;
+    for (i = 0; i < PLAYER_NAME_LENGTH && src[i] != '\0'; i++)
+    {
+        char c = src[i];
+        if (c >= 'A' && c <= 'Z')
+            dst[i] = 0xBB + (c - 'A');
+        else if (c >= 'a' && c <= 'z')
+            dst[i] = 0xD5 + (c - 'a');
+        else
+            dst[i] = 0x00; // space
+    }
+    dst[i] = 0xFF; // EOS
+}
+#endif
+
 void StartNewGameScene(void)
 {
+#if defined(PRESET_PLAYER_GENDER) && defined(PRESET_PLAYER_NAME) && defined(PRESET_RIVAL_NAME)
+    gSaveBlock2Ptr->playerGender = PRESET_PLAYER_GENDER;
+    CopyAsciiToGameName(gSaveBlock2Ptr->playerName, PRESET_PLAYER_NAME);
+    CopyAsciiToGameName(gSaveBlock1Ptr->rivalName, PRESET_RIVAL_NAME);
+    gTextFlags.canABSpeedUpPrint = FALSE;
+    SetMainCallback2(CB2_NewGame);
+#else
     gPlttBufferUnfaded[0] = RGB_BLACK;
     gPlttBufferFaded[0]   = RGB_BLACK;
     CreateTask(Task_NewGameScene, 0);
     SetMainCallback2(CB2_NewGameScene);
+#endif
 }
 
 #define tSpriteTimer                data[0]
@@ -774,9 +803,11 @@ static void Task_NewGameScene(u8 taskId)
         FillBgTilemapBufferRect_Palette0(1, 0xD00F, 0,  0, 30, 2);
         FillBgTilemapBufferRect_Palette0(1, 0xD002, 0,  2, 30, 1);
         FillBgTilemapBufferRect_Palette0(1, 0xD00E, 0, 19, 30, 1);
+#ifndef SKIP_CONTROLS_GUIDE
         ControlsGuide_LoadPage1();
-        gPaletteFade.bufferTransferDisabled = FALSE;
         gTasks[taskId].tTextCursorSpriteId = CreateTextCursorSprite(0, 230, 149, 0, 0);
+#endif
+        gPaletteFade.bufferTransferDisabled = FALSE;
         BlendPalettes(PALETTES_ALL, 16, RGB_BLACK);
         break;
     case 10:
@@ -785,8 +816,13 @@ static void Task_NewGameScene(u8 taskId)
         ShowBg(0);
         ShowBg(1);
         SetVBlankCallback(VBlankCB_NewGameScene);
+#ifdef SKIP_CONTROLS_GUIDE
+        gTasks[taskId].tTimer = 0;
+        gTasks[taskId].func = Task_PikachuIntro_LoadPage1;
+#else
         PlayBGM(MUS_NEW_GAME_INSTRUCT);
         gTasks[taskId].func = Task_ControlsGuide_HandleInput;
+#endif
         gMain.state = 0;
         return;
     }
